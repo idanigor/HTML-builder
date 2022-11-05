@@ -1,9 +1,9 @@
-const {stdin, exit } = require('process')
+const { stdin, exit } = require('process')
 const { join } = require('path')
 const fs = require('fs')
 const stream = fs.createWriteStream(join(__dirname, 'text.txt'))
 const gate = () => {
-  console.log('Exit')
+  console.log('Bye!')
   exit()
 }
 
@@ -13,3 +13,5 @@ stdin.on('data', text => {
   if (text.toString().trimEnd() === 'exit') gate()
   stream.write(text)
 })
+
+//! если не срабатывает "ctrl" + "c" через bash - обновите его "git update-git-for-windows"
