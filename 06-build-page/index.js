@@ -1,28 +1,31 @@
 const fs = require('fs')
 const fsPromises = require('fs/promises')
 const { join, parse } = require('path')
-const pathStyleBundle = join(__dirname, 'project-dist', 'style.css')
-const pathIndexBundle = join(__dirname, 'project-dist', 'index.html')
+const pathProjectDist = join(__dirname, 'project-dist')
+const pathStyleBundle = join(pathProjectDist, 'style.css')
+const pathIndexBundle = join(pathProjectDist, 'index.html')
 
-fsPromises.mkdir(join(__dirname, 'project-dist'), { recursive: true })
-fsPromises.mkdir(join(__dirname, 'project-dist', 'assets'), { recursive: true })
+createAndDelete()
 
-async function getBundle() {
+async function createAndDelete() {
+	await fsPromises.mkdir(join(pathProjectDist), { recursive: true })
+	await fsPromises.mkdir(join(pathProjectDist, 'assets'), {
+		recursive: true,
+	})
+	fs.stat(pathStyleBundle, async (error) => {
+		if (!error) {
+			await fsPromises.unlink(pathStyleBundle)
+		}
+	})
+	fs.stat(pathIndexBundle, async (error) => {
+		if (!error) {
+			await fsPromises.unlink(pathIndexBundle)
+		}
+	})
+	getStyle()
+}
 
-	// await fsPromises.stat(pathStyleBundle, async (error) => {
-	// 	if (!error) {
-	// 		await fsPromises.unlink(pathStyleBundle)
-	// 	}
-	// })
-
-	// await fsPromises.stat(pathIndexBundle, async (error) => {
-	// 	if (!error) {
-	// 		await fsPromises.unlink(pathIndexBundle)
-	// 	}
-	// })
-
-	await fsPromises.copyFile(join(__dirname, 'template.html'), pathIndexBundle)
-
+async function getStyle() {
 	const filesStyle = await fsPromises.readdir(join(__dirname, 'styles'), {
 		withFileTypes: true,
 	})
@@ -33,36 +36,58 @@ async function getBundle() {
 				join(__dirname, 'styles', file.name),
 				'utf8'
 			)
-			fsPromises.appendFile(pathStyleBundle, data)
+			await fsPromises.appendFile(pathStyleBundle, data)
 		}
 	})
+	getAssets()
+}
 
-	const dirsAssets = await fsPromises.readdir(join(__dirname, 'assets'))
+async function getAssets() {
+	const pathAssets = join(__dirname, 'assets')
+	const dirsAssets = await fsPromises.readdir(pathAssets)
 
 	dirsAssets.forEach(async (dirs) => {
-		fsPromises.mkdir(join(__dirname, 'project-dist', 'assets', dirs), {
+		await fsPromises.mkdir(join(pathProjectDist, 'assets', dirs), {
 			recursive: true,
 		})
 		await fsPromises
-			.readdir(join(__dirname, 'project-dist', 'assets', dirs))
+			.readdir(join(pathProjectDist, 'assets', dirs))
 			.then(async (data) => {
 				if (data) {
 					data.forEach(async (el) => {
-						await fsPromises.unlink(
-							join(__dirname, 'project-dist', 'assets', dirs, el)
-						)
+						await fsPromises.unlink(join(pathProjectDist, 'assets', dirs, el))
 					})
 				}
 			})
 
-		const files = await fsPromises.readdir(join(__dirname, 'assets', dirs))
+		const files = await fsPromises.readdir(join(pathAssets, dirs))
 		files.forEach(async (file) => {
 			await fsPromises.copyFile(
-				join(__dirname, 'assets', dirs, file),
-				join(__dirname, 'project-dist', 'assets', dirs, file)
+				join(pathAssets, dirs, file),
+				join(pathProjectDist, 'assets', dirs, file)
 			)
 		})
 	})
+	getHTML()
 }
 
-getBundle()
+async function getHTML() {
+	await fsPromises.copyFile(join(__dirname, 'template.html'), pathIndexBundle)
+
+	let text = await fsPromises.readFile(
+		join(__dirname, 'template.html'),
+		'utf-8'
+	)
+	const arrTags = text.match(/{{(.*)}}/g)
+
+	arrTags.forEach(async (tag) => {
+		const tagText = await fsPromises.readFile(
+			join(__dirname, 'components', `${tag.slice(2, -2)}.html`),
+			'utf-8'
+		)
+		text = text.replace(tag, tagText)
+		if (tag === arrTags.at(-1)) {
+			await fsPromises.writeFile(join(pathProjectDist, 'index.html'), text)
+		}
+	})
+}
